@@ -73,4 +73,16 @@ OmarHassunehAssignment2$s3c <- arr2[,1]
 OmarHassunehAssignment2$s3d <- c(arr[2,2,1],arr[2,2,2],arr[2,2,3])
 OmarHassunehAssignment2$s3e <- paste(arr[3,2,2],arr[1,2,2],arr[1,1,1],arr[3,3,2], sep = "")  
 
+
+
+# 4 # 
+library(foreign)
+org<-read.dta("https://github.com/EconomiCurtis/econ294_2015/raw/master/data/org_example.dta")
+
+sort(unique(org$year))
+sort(unique(org$month))
+sort(unique(org$educ))
+
+OmarHassunehAssignment2$s4 <- aggregate(org$rw, list(year=org$year, month=org$month, educ=org$educ), mean, na.rm=TRUE)
+
 save(OmarHassunehAssignment2,file = "~/ECON294A/OmarHassunehAssignment2.RData")
