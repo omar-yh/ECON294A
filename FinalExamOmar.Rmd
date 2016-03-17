@@ -1,0 +1,192 @@
+---
+title: "Final Exam"
+author: "OmarHassuneh"
+date: "March 17, 2016"
+output: html_document
+---
+```{r,warning=FALSE,message=FALSE}
+library ("RSQLite")
+library ("dplyr") 
+library ("nycflights13")
+library("ggplot2")
+
+DataBase <- src_sqlite("my.sqlite2", create = T)
+
+flights_sqlite <- copy_to(
+  DataBase, flights, temporary = FALSE, 
+  indexes = list(
+    c("year", "month", "day"), 
+    "carrier", 
+    "tailnum")
+)
+airports_sqlite <- copy_to(
+  DataBase, airports, temporary = FALSE, 
+  indexes = list("faa")
+)
+
+
+airlines_sqlite <- copy_to(
+  DataBase, airlines, temporary = FALSE, 
+  indexes = list("carrier")
+)
+
+
+weather_sqlite <- copy_to(
+  DataBase, weather, temporary = FALSE, 
+  indexes = list(
+    c("year", "month","day","hour"),
+    "origin")
+)
+
+
+planes_sqlite <- copy_to(
+  DataBase, planes, temporary = FALSE, 
+  indexes = list("tailnum")
+)
+
+
+nycflights13_sqlite()
+DataBase
+
+flights_sqlite <- tbl(DataBase, "flights")
+flights_sqlite
+
+flights = tbl(DataBase, "flights") %>% 
+  collect() %>%
+  mutate(canceled = is.na(arr_time))
+
+```
+
+A. depature
+a) weather 
+```{r,warning=FALSE,message=FALSE}
+flights_weather <- left_join(
+  tbl(DataBase, "flights"),
+  tbl(DataBase, "weather"),
+  by = "origin")
+
+reg_delay_temp<-lm(dep_delay~temp+dewp+humid+wind_dir+wind_speed+pressure,flights_weather)
+summary(reg_delay_temp)
+```
+Just pressure in this regression is 90% significant.
+
+b) time of day, day of week, and time of year, and any other aspect of time
+```{r,warning=FALSE,message=FALSE}
+flights_day <- tbl(DataBase, "flights") %>%
+  group_by(day) %>%
+  summarize(
+    avg_delay = mean(dep_delay)   
+  )%>%collect()
+
+flights_day<-data.frame(flights_day)
+p<- ggplot(flights_day, aes(x= factor(day),y=avg_delay)) + geom_bar(stat="identity", fill = "red")
+p
+flights_month <- tbl(DataBase, "flights") %>%
+  group_by(month) %>%
+  summarize(
+    avg_delay = mean(dep_delay)   
+  )%>%collect()
+
+flights_month<-data.frame(flights_month)
+p<- ggplot(flights_month, aes(x= factor(month),y=avg_delay)) + geom_bar(stat="identity", fill = "red")
+p
+```
+Only 2013 in data, we can not analyze the dep_delay of year. We can tell that in June and July always get dep_delay.
+But May get the smallest number of dep_delay.
+The dep_delay is keep changing.
+
+3.destination
+```{r,warning=FALSE,message=FALSE}
+f_a <- left_join(
+  tbl(DataBase, "flights"),
+  tbl(DataBase, "airports"),
+  by = c("dest"="faa"))
+
+f_a<-data.frame(f_a)
+f_a_1 <- f_a %>%
+  group_by(faa) %>%
+  summarize(
+    delaymean = mean(dep_delay,na.rm = T)    
+  ) 
+p<- ggplot(f_a_1, aes(x= factor(faa),y=delaymean))+geom_bar(stat="identity", fill = "red")
+p
+```
+From the graph,In all those destinations, LEX planes arrive earliest.
+But SBN get  departure delay is the higest.
+
+4.planes
+```{r,warning=FALSE,message=FALSE}
+f_p <- left_join(
+  tbl(DataBase, "flights"),
+  tbl(DataBase, "planes"),
+  by = "tailnum")
+
+f_p<-data.frame(f_p)
+f_p_1 <- f_p %>%
+  group_by(manufacturer) %>%
+  summarize(
+    delaymean = mean(dep_delay,na.rm = T)    
+  )
+
+p <- ggplot(f_p_1, aes(x= factor(manufacturer),y=delaymean)) + geom_bar(stat="identity", fill = "red")+ theme(axis.text.x=element_text(angle = 90))
+p
+```
+From the graph, I can tell that HURLEY JAMES LARRY get the lowest departure.
+but planes in AGUSTA SPA always delay.
+
+Part B cancelation
+1.
+```{r,warning=FALSE,message=FALSE}
+c_w <- flights_sqlite %>% left_join(weather, by = "origin", copy = TRUE) %>% mutate(canceled = is.na(arr_time))
+
+c_w<-data.frame(c_w)
+
+g_p<- lm(canceled~pressure,c_w)
+summary(g_p)
+```
+
+2.
+```{r,warning=FALSE,message=FALSE}
+flights_canceled = tbl(DataBase, "flights") %>% 
+  collect() %>%
+  mutate(canceled = is.na(arr_time))
+
+flights_canceled<-data.frame(flights_canceled)
+
+f_c <- flights_canceled %>%
+  group_by(month) %>%
+  summarize(
+    canceled = sum(canceled)    
+  ) 
+
+
+p <- ggplot(f_c, aes(x= factor(month),y=canceled)) + geom_bar(stat="identity")
+p
+
+f_d <- flights_canceled %>%
+  group_by(day) %>%
+  summarize(
+    canceled = sum(canceled)    
+  ) 
+
+p <- ggplot(f_d, aes(x= factor(day),y=canceled)) + geom_bar(stat="identity")
+p
+```
+February alawys cancel the plane,which is very higher than the other month.
+and on 8th of a month alway cancel the planes.
+
+3.destination
+```{r,warning=FALSE,message=FALSE}
+f_e <- flights_sqlite %>% left_join(airports, by = c("dest"="faa"), copy = TRUE) %>% mutate(canceled = is.na(arr_time))
+
+f_e<-data.frame(f_e)
+
+f_g <- f_e %>%
+  group_by(faa) %>%
+  summarize(
+    canceled = sum(canceled,na.rm = T)    
+  ) 
+p <- ggplot(f_g, aes(x= factor(faa),y=canceled)) + geom_bar(stat="identity")+theme(axis.text.x=element_text(angle = 75))
+p
+```
+The destination which name is DCA always cancel all the planes.
